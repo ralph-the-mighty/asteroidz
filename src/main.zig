@@ -57,7 +57,7 @@ pub fn sub(a: Point, b: Point) Point {
     };
 }
 
-//TODO: figure out if this is dot product or the other one
+//TODO: figure out if this is dot product or cross product or whatever it is
 pub fn scale(p: Point, scalar: f32) Point {
     return .{
         .x = p.x * scalar,
@@ -84,9 +84,6 @@ pub fn was_down(key: c.SDL_Scancode) bool {
 pub fn came_down(key: c.SDL_Scancode) bool {
   return is_down(key) and !was_down(key);
 }
-
-
-
 
 
 
@@ -155,7 +152,7 @@ pub fn main() anyerror!void {
         }
         
         
-        if(is_down(41)) { //esc
+        if(is_down(c.SDL_SCANCODE_ESCAPE)) {
             break :mainloop;
         }
 
@@ -177,7 +174,7 @@ pub fn main() anyerror!void {
     //   }
 
 
-        if(is_down(79)) { //right
+        if(is_down(c.SDL_SCANCODE_RIGHT)) {
             var new_rotation = Point {
                 .x = (player.rotation.x * std.math.cos(TURN_RATE * dt)) - (player.rotation.y * std.math.sin(TURN_RATE * dt)),
                 .y = (player.rotation.x * std.math.sin(TURN_RATE * dt)) + (player.rotation.y * std.math.cos(TURN_RATE * dt)),
@@ -186,7 +183,7 @@ pub fn main() anyerror!void {
             player.rotation = new_rotation;
         }
 
-        if(is_down(80)) { //left
+        if(is_down(c.SDL_SCANCODE_LEFT)) {
             var new_rotation = Point {
                 .x = (player.rotation.x * std.math.cos(-TURN_RATE * dt)) - (player.rotation.y * std.math.sin(-TURN_RATE * dt)),
                 .y = (player.rotation.x * std.math.sin(-TURN_RATE * dt)) + (player.rotation.y * std.math.cos(-TURN_RATE * dt)),
@@ -197,7 +194,7 @@ pub fn main() anyerror!void {
 
 
 
-        if(is_down(82)) { //up
+        if(is_down(c.SDL_SCANCODE_UP)) {
             player.vel = add(player.vel, scale(player.rotation, THRUST_VEL * dt));
         }
 
@@ -227,7 +224,7 @@ pub fn main() anyerror!void {
         _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y), @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y));
 
 
-        if(is_down(82) and ((frame >> 1) & 0x1) == 1) {
+        if(is_down(c.SDL_SCANCODE_UP) and ((frame >> 1) & 0x1) == 1) {
 
             var flame_p1 = sub(sub(p1, (scale(player.rotation, 2))), scale(perp_rotation, 3));
             var flame_p2 = add(sub(p2, (scale(player.rotation, 2))), scale(perp_rotation, 3));
