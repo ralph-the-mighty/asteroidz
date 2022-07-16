@@ -10,7 +10,7 @@ const PLAYER_MAX_VEL = 400;
 const PLAYER_MIN_VEL = 0;
 const BULLET_VEL = 500;
 
-const dt = 1.0 / 60.0;
+const dt: f32 = 1.0 / 144.0;
 
 
 
@@ -32,8 +32,8 @@ var player = Player{
         .y = 200
     },
     .rotation = .{
-        .x = 1,
-        .y = 0
+        .x = 0,
+        .y = 1
     },
     .vel = .{
         .x = 0,
@@ -138,50 +138,67 @@ pub fn main() anyerror!void {
                 c.SDL_QUIT => break :mainloop,
                 c.SDL_KEYDOWN => {
                     var scancode = sdl_event.key.keysym.scancode;
-                    std.debug.print("KEYDOWN: {d}!\n", .{scancode});
+                    std.debug.print("{d}", .{scancode});
                     Keys[scancode].was_down = Keys[scancode].is_down;
                     Keys[scancode].is_down = true; 
                 },
                 c.SDL_KEYUP => {
                     var scancode = sdl_event.key.keysym.scancode;
-                    std.debug.print("KEYUP: {d}!\n", .{scancode});
                     Keys[scancode].was_down = Keys[scancode].is_down;
                     Keys[scancode].is_down = false; 
                 },
                 else => {},
             }
         }
+        
+        
+        if(is_down(41)) { //esc
+            break :mainloop;
+        }
+
+
+    //if is_down(.LEFT) {
+    //     new_rotation: linalg.Vector2f32;
+    //     new_rotation.x = game.player.rotation.x * math.cos(-TURN_RATE * dt) - game.player.rotation.y * math.sin(-TURN_RATE * dt);
+    //     new_rotation.y = game.player.rotation.x * math.sin(-TURN_RATE * dt) + game.player.rotation.y * math.cos(-TURN_RATE * dt);
+          
+    //     game.player.rotation = new_rotation;
+    //   }
+      
+    //   if is_down(.RIGHT) {
+    //     new_rotation: linalg.Vector2f32;
+    //     new_rotation.x = game.player.rotation.x * math.cos(TURN_RATE * dt) - game.player.rotation.y * math.sin(TURN_RATE * dt);
+    //     new_rotation.y = game.player.rotation.x * math.sin(TURN_RATE * dt) + game.player.rotation.y * math.cos(TURN_RATE * dt);
+
+    //     game.player.rotation = new_rotation;
+    //   }
 
 
         if(is_down(79)) { //right
-            std.debug.print("Right!\n", .{});
-            player.rotation = Point {
-                .x = player.rotation.x * std.math.cos(TURN_RATE * dt) - player.rotation.y * std.math.sin(TURN_RATE * dt),
-                .y = player.rotation.x * std.math.sin(TURN_RATE * dt) + player.rotation.y * std.math.cos(TURN_RATE * dt),
+            var new_rotation = Point {
+                .x = (player.rotation.x * std.math.cos(TURN_RATE * dt)) - (player.rotation.y * std.math.sin(TURN_RATE * dt)),
+                .y = (player.rotation.x * std.math.sin(TURN_RATE * dt)) + (player.rotation.y * std.math.cos(TURN_RATE * dt)),
             };
+
+            player.rotation = new_rotation;
         }
 
         if(is_down(80)) { //left
-            std.debug.print("Left!\n", .{});
-            player.rotation = Point {
-                .x = player.rotation.x * std.math.cos(-TURN_RATE * dt) - player.rotation.y * std.math.sin(-TURN_RATE * dt),
-                .y = player.rotation.x * std.math.sin(-TURN_RATE * dt) + player.rotation.y * std.math.cos(-TURN_RATE * dt),
+            var new_rotation = Point {
+                .x = (player.rotation.x * std.math.cos(-TURN_RATE * dt)) - (player.rotation.y * std.math.sin(-TURN_RATE * dt)),
+                .y = (player.rotation.x * std.math.sin(-TURN_RATE * dt)) + (player.rotation.y * std.math.cos(-TURN_RATE * dt)),
             };
+            player.rotation = new_rotation;
+            const normal = std.math.sqrt(player.rotation.x * player.rotation.x + player.rotation.y * player.rotation.y);
+            std.debug.print("turn: {d}, rotation length: {d}\n", .{-TURN_RATE * dt, normal});
         }
 
         if(is_down(81)) { //down
       
-        
-        // if linalg.length(game.player.vel) > PLAYER_MAX_VEL {
-        //   game.player.vel = linalg.normalize(game.player.vel) * PLAYER_MAX_VEL;
-        // }
-      
-            std.debug.print("Down!\n", .{});
         }
 
         if(is_down(82)) { //up
             player.vel = add(player.vel, scale(player.rotation, THRUST_VEL * dt));
-            std.debug.print("Up!\n", .{});
         }
 
         player.pos = add(player.pos, scale(player.vel, dt));
@@ -199,8 +216,8 @@ pub fn main() anyerror!void {
         perp_rotation.x = player.rotation.y;
         perp_rotation.y = -player.rotation.x;
 
-        p1 = add(player.pos, sub(scale(perp_rotation, 6), scale(perp_rotation, 5)));
-        p2 = sub(sub(player.pos, scale(perp_rotation, 6)), scale(perp_rotation, 5));
+        p1 = add(player.pos, sub(scale(perp_rotation, 6), scale(player.rotation, 5)));
+        p2 = sub(sub(player.pos, scale(perp_rotation, 6)), scale(player.rotation, 5));
         p3 = add(player.pos, scale(player.rotation, 15));
 
 
@@ -209,10 +226,6 @@ pub fn main() anyerror!void {
         _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y), @floatToInt(c_int, p2.x), @floatToInt(c_int, p2.y));
         _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p2.x), @floatToInt(c_int, p2.y), @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y));
         _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y), @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y));
-
-        // _ = c.SDL_RenderDrawLine(renderer, 200, 200, 250, 250);
-        // _ = c.SDL_RenderDrawLine(renderer, 250, 250, 300, 200);
-        // _ = c.SDL_RenderDrawLine(renderer, 300, 200, 200, 200);
 
 
         c.SDL_RenderPresent(renderer);
