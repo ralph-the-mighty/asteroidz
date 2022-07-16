@@ -132,13 +132,16 @@ pub fn main() anyerror!void {
 
     var frame: usize = 0;
     mainloop: while (true) {
+
+        std.debug.print("{d}\r", .{frame});
+
         var sdl_event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&sdl_event) != 0) {
             switch (sdl_event.type) {
                 c.SDL_QUIT => break :mainloop,
                 c.SDL_KEYDOWN => {
                     var scancode = sdl_event.key.keysym.scancode;
-                    std.debug.print("{d}", .{scancode});
+                    // std.debug.print("{d}", .{scancode});
                     Keys[scancode].was_down = Keys[scancode].is_down;
                     Keys[scancode].is_down = true; 
                 },
@@ -189,13 +192,10 @@ pub fn main() anyerror!void {
                 .y = (player.rotation.x * std.math.sin(-TURN_RATE * dt)) + (player.rotation.y * std.math.cos(-TURN_RATE * dt)),
             };
             player.rotation = new_rotation;
-            const normal = std.math.sqrt(player.rotation.x * player.rotation.x + player.rotation.y * player.rotation.y);
-            std.debug.print("turn: {d}, rotation length: {d}\n", .{-TURN_RATE * dt, normal});
+            // const normal = std.math.sqrt(player.rotation.x * player.rotation.x + player.rotation.y * player.rotation.y);
         }
 
-        if(is_down(81)) { //down
-      
-        }
+
 
         if(is_down(82)) { //up
             player.vel = add(player.vel, scale(player.rotation, THRUST_VEL * dt));
@@ -221,11 +221,24 @@ pub fn main() anyerror!void {
         p3 = add(player.pos, scale(player.rotation, 15));
 
 
-
         _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
         _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y), @floatToInt(c_int, p2.x), @floatToInt(c_int, p2.y));
         _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p2.x), @floatToInt(c_int, p2.y), @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y));
         _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y), @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y));
+
+
+        if(is_down(82) and ((frame >> 1) & 0x1) == 1) {
+
+            var flame_p1 = sub(sub(p1, (scale(player.rotation, 2))), scale(perp_rotation, 3));
+            var flame_p2 = add(sub(p2, (scale(player.rotation, 2))), scale(perp_rotation, 3));
+            var flame_p3 = sub(player.pos, (scale(player.rotation, 10)));
+         
+            _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p1.x), @floatToInt(c_int, flame_p1.y), @floatToInt(c_int, flame_p2.x), @floatToInt(c_int, flame_p2.y));
+            _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p2.x), @floatToInt(c_int, flame_p2.y), @floatToInt(c_int, flame_p3.x), @floatToInt(c_int, flame_p3.y));
+            _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p3.x), @floatToInt(c_int, flame_p3.y), @floatToInt(c_int, flame_p1.x), @floatToInt(c_int, flame_p1.y));
+        }
+
+
 
 
         c.SDL_RenderPresent(renderer);
