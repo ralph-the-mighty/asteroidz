@@ -107,25 +107,6 @@ var game: Game = Game{
 };
 
 
-// update_particles :: proc(dt: f32) {
-      //update bullets
-      //update bullets
-    //   for b, i in &game.bullets {
-    //     b.lifetime -= dt;
-          
-    //     if b.lifetime <= 0 {
-    //       unordered_remove(&game.bullets, i);
-    //       continue;
-    //     }
-          
-    //     b.pos = b.pos + b.vel * dt;
-    //     wrap_position(&b.pos);
-    //   }
-//}
-
-
-
-
 pub fn draw_player(renderer: c.SDL_Renderer) void {
     _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, c.SDL_ALPHA_OPAQUE);
     _ = c.SDL_RenderDrawLine(renderer, 0, 0, 100, 100);
@@ -230,41 +211,27 @@ pub fn main() anyerror!void {
 
     
         if(came_down(c.SDL_SCANCODE_SPACE)){
-            std.debug.print("Fire!", .{});
             var new_bullet: Bullet = .{
-                .pos = Point{
-                    .x = 100,
-                    .y = 100,
-                },
-                .vel = Point{
-                    .x = 0.1,
-                    .y = 0.1
-                },
+                .pos = add(player.pos, scale(player.rotation, 15)),
+                .vel = scale(player.rotation, 7),
                 .lifetime = 5.0,
             }; 
             try bullets.append(new_bullet);
-
-            for (bullets.items) |b| {
-                // try testing.expect(v == @intCast(i32, i + 1));
-                std.debug.print("{s}\n", .{b});
-            }
         }
 
 
-        for (bullets.items) |b, i| {
-            // try testing.expect(v == @intCast(i32, i + 1));
-            std.debug.print("{s}\n", .{b});
+        var i: usize = 0;
+        while(i < bullets.items.len) {
+            var b = bullets.items[i];
             bullets.items[i].pos = add(b.pos, b.vel);
             bullets.items[i].lifetime -= 0.1;
 
             if (b.lifetime <= 0) {
                 _ = bullets.swapRemove(i);
+            } else {
+                i += 1;
             }
-            
         }
-
-
-
 
         _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         _ = c.SDL_RenderClear(renderer);
