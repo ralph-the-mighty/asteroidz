@@ -33,7 +33,7 @@ pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{ .default_target = .{ .abi = .gnu } });
     const mode = b.standardReleaseOptions();
 
-    const exe = b.addExecutable("game", "src/main.zig");
+    const exe = b.addExecutable("asteroidz", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
 

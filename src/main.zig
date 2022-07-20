@@ -57,7 +57,7 @@ pub fn sub(a: Point, b: Point) Point {
     };
 }
 
-//TODO: figure out if this is dot product or cross product or whatever it is
+
 pub fn scale(p: Point, scalar: f32) Point {
     return .{
         .x = p.x * scalar,
@@ -84,6 +84,45 @@ pub fn was_down(key: c.SDL_Scancode) bool {
 pub fn came_down(key: c.SDL_Scancode) bool {
   return is_down(key) and !was_down(key);
 }
+
+
+
+
+
+
+
+
+const Bullet = struct {
+    pos: Point,
+    vel: Point,
+    lifetime: f32,
+};
+
+const Game = struct {
+    bullets: std.ArrayList(Bullet),
+};
+
+var game: Game = Game{
+    .bullets = undefined
+};
+
+
+// update_particles :: proc(dt: f32) {
+      //update bullets
+      //update bullets
+    //   for b, i in &game.bullets {
+    //     b.lifetime -= dt;
+          
+    //     if b.lifetime <= 0 {
+    //       unordered_remove(&game.bullets, i);
+    //       continue;
+    //     }
+          
+    //     b.pos = b.pos + b.vel * dt;
+    //     wrap_position(&b.pos);
+    //   }
+//}
+
 
 
 
@@ -119,18 +158,23 @@ pub fn main() anyerror!void {
     _ = c.SDL_Init(c.SDL_INIT_VIDEO);
     defer c.SDL_Quit();
 
-    var window = c.SDL_CreateWindow("hello gamedev", c.SDL_WINDOWPOS_CENTERED, c.SDL_WINDOWPOS_CENTERED, 640, 400, 0);
+    var window = c.SDL_CreateWindow("asteroidz", c.SDL_WINDOWPOS_CENTERED, c.SDL_WINDOWPOS_CENTERED, 640, 400, 0);
     defer c.SDL_DestroyWindow(window);
 
     var renderer = c.SDL_CreateRenderer(window, 0, c.SDL_RENDERER_PRESENTVSYNC);
     defer c.SDL_DestroyRenderer(renderer);
 
-
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = true }){};
+    defer {
+        _ = gpa.deinit();
+    }
+    var bullets = std.ArrayList(Bullet).init(gpa.allocator());
+    defer bullets.deinit();
 
     var frame: usize = 0;
     mainloop: while (true) {
 
-        std.debug.print("{d}\r", .{frame});
+        // std.debug.print("{d}\r", .{frame});
 
         var sdl_event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&sdl_event) != 0) {
@@ -145,7 +189,7 @@ pub fn main() anyerror!void {
                 c.SDL_KEYUP => {
                     var scancode = sdl_event.key.keysym.scancode;
                     Keys[scancode].was_down = Keys[scancode].is_down;
-                    Keys[scancode].is_down = false; 
+                    Keys[scancode].is_down = false;
                 },
                 else => {},
             }
@@ -155,24 +199,6 @@ pub fn main() anyerror!void {
         if(is_down(c.SDL_SCANCODE_ESCAPE)) {
             break :mainloop;
         }
-
-
-    //if is_down(.LEFT) {
-    //     new_rotation: linalg.Vector2f32;
-    //     new_rotation.x = game.player.rotation.x * math.cos(-TURN_RATE * dt) - game.player.rotation.y * math.sin(-TURN_RATE * dt);
-    //     new_rotation.y = game.player.rotation.x * math.sin(-TURN_RATE * dt) + game.player.rotation.y * math.cos(-TURN_RATE * dt);
-          
-    //     game.player.rotation = new_rotation;
-    //   }
-      
-    //   if is_down(.RIGHT) {
-    //     new_rotation: linalg.Vector2f32;
-    //     new_rotation.x = game.player.rotation.x * math.cos(TURN_RATE * dt) - game.player.rotation.y * math.sin(TURN_RATE * dt);
-    //     new_rotation.y = game.player.rotation.x * math.sin(TURN_RATE * dt) + game.player.rotation.y * math.cos(TURN_RATE * dt);
-
-    //     game.player.rotation = new_rotation;
-    //   }
-
 
         if(is_down(c.SDL_SCANCODE_RIGHT)) {
             var new_rotation = Point {
@@ -199,6 +225,44 @@ pub fn main() anyerror!void {
         }
 
         player.pos = add(player.pos, scale(player.vel, dt));
+
+
+
+    
+        if(came_down(c.SDL_SCANCODE_SPACE)){
+            std.debug.print("Fire!", .{});
+            var new_bullet: Bullet = .{
+                .pos = Point{
+                    .x = 100,
+                    .y = 100,
+                },
+                .vel = Point{
+                    .x = 0.1,
+                    .y = 0.1
+                },
+                .lifetime = 5.0,
+            }; 
+            try bullets.append(new_bullet);
+
+            for (bullets.items) |b| {
+                // try testing.expect(v == @intCast(i32, i + 1));
+                std.debug.print("{s}\n", .{b});
+            }
+        }
+
+
+        for (bullets.items) |b, i| {
+            // try testing.expect(v == @intCast(i32, i + 1));
+            std.debug.print("{s}\n", .{b});
+            bullets.items[i].pos = add(b.pos, b.vel);
+            bullets.items[i].lifetime -= 0.1;
+
+            if (b.lifetime <= 0) {
+                _ = bullets.swapRemove(i);
+            }
+            
+        }
+
 
 
 
@@ -233,6 +297,12 @@ pub fn main() anyerror!void {
             _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p1.x), @floatToInt(c_int, flame_p1.y), @floatToInt(c_int, flame_p2.x), @floatToInt(c_int, flame_p2.y));
             _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p2.x), @floatToInt(c_int, flame_p2.y), @floatToInt(c_int, flame_p3.x), @floatToInt(c_int, flame_p3.y));
             _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p3.x), @floatToInt(c_int, flame_p3.y), @floatToInt(c_int, flame_p1.x), @floatToInt(c_int, flame_p1.y));
+        }
+
+
+
+        for (bullets.items) |b| {
+            _ = c.SDL_RenderDrawPoint(renderer, @floatToInt(c_int, b.pos.x), @floatToInt(c_int, b.pos.y));            
         }
 
 
