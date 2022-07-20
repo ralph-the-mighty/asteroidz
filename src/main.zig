@@ -136,7 +136,7 @@ pub fn draw_player(renderer: c.SDL_Renderer) void {
 
 
 pub fn main() anyerror!void {
-    _ = c.SDL_Init(c.SDL_INIT_VIDEO);
+    _ = c.SDL_Init(c.SDL_INIT_VIDEO | c.SDL_INIT_EVENTS);
     defer c.SDL_Quit();
 
     var window = c.SDL_CreateWindow("asteroidz", c.SDL_WINDOWPOS_CENTERED, c.SDL_WINDOWPOS_CENTERED, 640, 400, 0);
@@ -156,6 +156,11 @@ pub fn main() anyerror!void {
     mainloop: while (true) {
 
         // std.debug.print("{d}\r", .{frame});
+        
+        //update keymap
+        for (Keys) |*key| {
+            key.*.was_down = key.is_down;
+        }
 
         var sdl_event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&sdl_event) != 0) {
@@ -165,12 +170,16 @@ pub fn main() anyerror!void {
                     var scancode = sdl_event.key.keysym.scancode;
                     // std.debug.print("{d}", .{scancode});
                     Keys[scancode].was_down = Keys[scancode].is_down;
-                    Keys[scancode].is_down = true; 
+                    Keys[scancode].is_down = true;
+
+                    std.debug.print("KEYDOWN! {d}, {s}\n", .{scancode, Keys[scancode]});
                 },
                 c.SDL_KEYUP => {
                     var scancode = sdl_event.key.keysym.scancode;
                     Keys[scancode].was_down = Keys[scancode].is_down;
                     Keys[scancode].is_down = false;
+
+                    std.debug.print("KEYUP! {d}, {s}\n", .{scancode, Keys[scancode]});
                 },
                 else => {},
             }
