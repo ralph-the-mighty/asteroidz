@@ -12,7 +12,9 @@ const BULLET_VEL = 500;
 
 const dt: f32 = 1.0 / 144.0;
 
-
+const Renderer = struct {
+    sdl_renderer: c.SDL_Renderer,
+};
 
 const Point = struct {
     x: f32,
@@ -26,20 +28,6 @@ const Player = struct {
     vel: Point,
 };
 
-var player = Player{
-    .pos = .{
-        .x = 200,
-        .y = 200
-    },
-    .rotation = .{
-        .x = 0,
-        .y = 1
-    },
-    .vel = .{
-        .x = 0,
-        .y = 0
-    }
-};
 
 
 pub fn add(a: Point, b: Point) Point {
@@ -99,40 +87,71 @@ const Bullet = struct {
 };
 
 const Game = struct {
+    frame: usize,
+    player: Player,
     bullets: std.ArrayList(Bullet),
 };
 
-var game: Game = Game{
-    .bullets = undefined
-};
+
+pub fn draw_player(renderer: *c.SDL_Renderer) void {
+    var p1: Point = .{.x=0, .y=0};
+    var p2: Point = .{.x=0, .y=0};
+    var p3: Point = .{.x=0, .y=0};
+    var perp_rotation: Point = .{.x=0, .y=0};
+
+    perp_rotation.x = game.player.rotation.y;
+    perp_rotation.y = -game.player.rotation.x;
+
+    p1 = add(game.player.pos, sub(scale(perp_rotation, 6), scale(game.player.rotation, 5)));
+    p2 = sub(sub(game.player.pos, scale(perp_rotation, 6)), scale(game.player.rotation, 5));
+    p3 = add(game.player.pos, scale(game.player.rotation, 15));
 
 
-pub fn draw_player(renderer: c.SDL_Renderer) void {
-    _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, c.SDL_ALPHA_OPAQUE);
-    _ = c.SDL_RenderDrawLine(renderer, 0, 0, 100, 100);
-
-    var p1 = Point;
-    var p2 = Point;
-    var p3 = Point;
-    var perp_rotation = Point;
-
-    perp_rotation.x = player.rotation.y;
-    perp_rotation.y = player.rotation.y;
-
-    p1 = add(player.pos, sub(scale(perp_rotation, 6), scale(perp_rotation * 5)));
-    p2 = sub(player.pos, sub(scale(perp_rotation, 6), scale(perp_rotation * 5)));
-    p3 = add(player.pos, scale(perp_rotation, 15));
+    _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
+    _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y), @floatToInt(c_int, p2.x), @floatToInt(c_int, p2.y));
+    _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p2.x), @floatToInt(c_int, p2.y), @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y));
+    _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y), @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y));
 
 
-    // const c.SDL_Point
-    // _ = c.SDL_RenderDrawLines(renderer, points, POINTS_COUNT);
+    if(is_down(c.SDL_SCANCODE_UP) and ((game.frame >> 1) & 0x1) == 1) {
 
-    _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, c.SDL_ALPHA_OPAQUE);
-    _ = c.SDL_RenderDrawLine(renderer, p1.x, p1.y, p2.x, p2.y);
-    _ = c.SDL_RenderDrawLine(renderer, p2.x, p2.y, p3.x, p3.y);
-    _ = c.SDL_RenderDrawLine(renderer, p3.x, p3.y, p1.x, p1.y);
+        var flame_p1 = sub(sub(p1, (scale(game.player.rotation, 2))), scale(perp_rotation, 3));
+        var flame_p2 = add(sub(p2, (scale(game.player.rotation, 2))), scale(perp_rotation, 3));
+        var flame_p3 = sub(game.player.pos, (scale(game.player.rotation, 10)));
+        
+        _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p1.x), @floatToInt(c_int, flame_p1.y), @floatToInt(c_int, flame_p2.x), @floatToInt(c_int, flame_p2.y));
+        _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p2.x), @floatToInt(c_int, flame_p2.y), @floatToInt(c_int, flame_p3.x), @floatToInt(c_int, flame_p3.y));
+        _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p3.x), @floatToInt(c_int, flame_p3.y), @floatToInt(c_int, flame_p1.x), @floatToInt(c_int, flame_p1.y));
+    }
 }
 
+pub fn draw_bullets(renderer: *c.SDL_Renderer) void {
+    _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
+    for (game.bullets.items) |b| {
+        _ = c.SDL_RenderDrawPoint(renderer, @floatToInt(c_int, b.pos.x), @floatToInt(c_int, b.pos.y));       
+    }
+}
+
+
+
+var game: Game = Game{
+    .frame = 0,
+    .bullets = undefined,
+    .player = Player{
+        .pos = .{
+            .x = 200,
+            .y = 200
+        },
+        .rotation = .{
+            .x = 0,
+            .y = 1
+        },
+        .vel = .{
+            .x = 0,
+            .y = 0
+        }
+    }
+};
 
 
 pub fn main() anyerror!void {
@@ -149,13 +168,12 @@ pub fn main() anyerror!void {
     defer {
         _ = gpa.deinit();
     }
-    var bullets = std.ArrayList(Bullet).init(gpa.allocator());
-    defer bullets.deinit();
+    game.bullets = std.ArrayList(Bullet).init(gpa.allocator());
+    defer game.bullets.deinit();
 
-    var frame: usize = 0;
     mainloop: while (true) {
 
-        // std.debug.print("{d}\r", .{frame});
+        // std.debug.print("{d}\r", .{game.frame});
         
         //update keymap
         for (Keys) |*key| {
@@ -171,15 +189,11 @@ pub fn main() anyerror!void {
                     // std.debug.print("{d}", .{scancode});
                     Keys[scancode].was_down = Keys[scancode].is_down;
                     Keys[scancode].is_down = true;
-
-                    std.debug.print("KEYDOWN! {d}, {s}\n", .{scancode, Keys[scancode]});
                 },
                 c.SDL_KEYUP => {
                     var scancode = sdl_event.key.keysym.scancode;
                     Keys[scancode].was_down = Keys[scancode].is_down;
                     Keys[scancode].is_down = false;
-
-                    std.debug.print("KEYUP! {d}, {s}\n", .{scancode, Keys[scancode]});
                 },
                 else => {},
             }
@@ -192,51 +206,48 @@ pub fn main() anyerror!void {
 
         if(is_down(c.SDL_SCANCODE_RIGHT)) {
             var new_rotation = Point {
-                .x = (player.rotation.x * std.math.cos(TURN_RATE * dt)) - (player.rotation.y * std.math.sin(TURN_RATE * dt)),
-                .y = (player.rotation.x * std.math.sin(TURN_RATE * dt)) + (player.rotation.y * std.math.cos(TURN_RATE * dt)),
+                .x = (game.player.rotation.x * std.math.cos(TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(TURN_RATE * dt)),
+                .y = (game.player.rotation.x * std.math.sin(TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(TURN_RATE * dt)),
             };
 
-            player.rotation = new_rotation;
+            game.player.rotation = new_rotation;
         }
 
         if(is_down(c.SDL_SCANCODE_LEFT)) {
             var new_rotation = Point {
-                .x = (player.rotation.x * std.math.cos(-TURN_RATE * dt)) - (player.rotation.y * std.math.sin(-TURN_RATE * dt)),
-                .y = (player.rotation.x * std.math.sin(-TURN_RATE * dt)) + (player.rotation.y * std.math.cos(-TURN_RATE * dt)),
+                .x = (game.player.rotation.x * std.math.cos(-TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(-TURN_RATE * dt)),
+                .y = (game.player.rotation.x * std.math.sin(-TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(-TURN_RATE * dt)),
             };
-            player.rotation = new_rotation;
+            game.player.rotation = new_rotation;
             // const normal = std.math.sqrt(player.rotation.x * player.rotation.x + player.rotation.y * player.rotation.y);
         }
 
 
-
         if(is_down(c.SDL_SCANCODE_UP)) {
-            player.vel = add(player.vel, scale(player.rotation, THRUST_VEL * dt));
+            game.player.vel = add(game.player.vel, scale(game.player.rotation, THRUST_VEL * dt));
         }
 
-        player.pos = add(player.pos, scale(player.vel, dt));
+        game.player.pos = add(game.player.pos, scale(game.player.vel, dt));
 
 
-
-    
         if(came_down(c.SDL_SCANCODE_SPACE)){
             var new_bullet: Bullet = .{
-                .pos = add(player.pos, scale(player.rotation, 15)),
-                .vel = scale(player.rotation, 7),
+                .pos = add(game.player.pos, scale(game.player.rotation, 15)),
+                .vel = scale(game.player.rotation, 7),
                 .lifetime = 5.0,
-            }; 
-            try bullets.append(new_bullet);
+            };
+            try game.bullets.append(new_bullet);
         }
 
 
         var i: usize = 0;
-        while(i < bullets.items.len) {
-            var b = bullets.items[i];
-            bullets.items[i].pos = add(b.pos, b.vel);
-            bullets.items[i].lifetime -= 0.1;
+        while(i < game.bullets.items.len) {
+            var b = game.bullets.items[i];
+            game.bullets.items[i].pos = add(b.pos, b.vel);
+            game.bullets.items[i].lifetime -= 0.1;
 
             if (b.lifetime <= 0) {
-                _ = bullets.swapRemove(i);
+                _ = game.bullets.swapRemove(i);
             } else {
                 i += 1;
             }
@@ -245,46 +256,10 @@ pub fn main() anyerror!void {
         _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         _ = c.SDL_RenderClear(renderer);
 
-        var p1: Point = .{.x=0, .y=0};
-        var p2: Point = .{.x=0, .y=0};
-        var p3: Point = .{.x=0, .y=0};
-        var perp_rotation: Point = .{.x=0, .y=0};
-
-        perp_rotation.x = player.rotation.y;
-        perp_rotation.y = -player.rotation.x;
-
-        p1 = add(player.pos, sub(scale(perp_rotation, 6), scale(player.rotation, 5)));
-        p2 = sub(sub(player.pos, scale(perp_rotation, 6)), scale(player.rotation, 5));
-        p3 = add(player.pos, scale(player.rotation, 15));
-
-
-        _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
-        _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y), @floatToInt(c_int, p2.x), @floatToInt(c_int, p2.y));
-        _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p2.x), @floatToInt(c_int, p2.y), @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y));
-        _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y), @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y));
-
-
-        if(is_down(c.SDL_SCANCODE_UP) and ((frame >> 1) & 0x1) == 1) {
-
-            var flame_p1 = sub(sub(p1, (scale(player.rotation, 2))), scale(perp_rotation, 3));
-            var flame_p2 = add(sub(p2, (scale(player.rotation, 2))), scale(perp_rotation, 3));
-            var flame_p3 = sub(player.pos, (scale(player.rotation, 10)));
-         
-            _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p1.x), @floatToInt(c_int, flame_p1.y), @floatToInt(c_int, flame_p2.x), @floatToInt(c_int, flame_p2.y));
-            _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p2.x), @floatToInt(c_int, flame_p2.y), @floatToInt(c_int, flame_p3.x), @floatToInt(c_int, flame_p3.y));
-            _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, flame_p3.x), @floatToInt(c_int, flame_p3.y), @floatToInt(c_int, flame_p1.x), @floatToInt(c_int, flame_p1.y));
-        }
-
-
-
-        for (bullets.items) |b| {
-            _ = c.SDL_RenderDrawPoint(renderer, @floatToInt(c_int, b.pos.x), @floatToInt(c_int, b.pos.y));            
-        }
-
-
-
+        draw_player(renderer.?);
+        draw_bullets(renderer.?);
 
         c.SDL_RenderPresent(renderer);
-        frame += 1;
+        game.frame += 1;
     }
 }
