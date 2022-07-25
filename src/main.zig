@@ -10,7 +10,6 @@ const PLAYER_MAX_VEL = 400;
 const PLAYER_MIN_VEL = 0;
 const BULLET_VEL = 500;
 
-const dt: f32 = 1.0 / 144.0;
 
 const Renderer = struct {
     sdl_renderer: c.SDL_Renderer,
@@ -213,21 +212,8 @@ pub fn draw_marker(renderer: *c.SDL_Renderer, x: c_int, y: c_int) void {
 }
 
 pub fn draw_asteroids(renderer: *c.SDL_Renderer) void {
-
     for (game.asteroids.items) |a| {
-        var transformed_points: [a.vertices.len]Point = undefined;
-        for(a.vertices) |vertex, i| {
-            transformed_points[i] = transform(a.rot, a.pos, vertex);
-        }
-
-        for(game.bullets.items) |b| {
-            if(point_in_polygon(b.pos, transformed_points[0..transformed_points.len])) {
-                _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0x00, c.SDL_ALPHA_OPAQUE);
-                break;
-            }
-        } else {
-            _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
-        }
+        _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
         
         var j: usize = 0;
         while (j < 5 - 1) : (j += 1) {
@@ -296,6 +282,141 @@ pub fn draw_bullets(renderer: *c.SDL_Renderer) void {
 }
 
 
+pub fn process_events() void {
+    for (Keys) |*key| {
+        key.*.was_down = key.is_down;
+    }
+
+    var sdl_event: c.SDL_Event = undefined;
+    while (c.SDL_PollEvent(&sdl_event) != 0) {
+        switch (sdl_event.type) {
+            c.SDL_QUIT => running = false,
+            c.SDL_KEYDOWN => {
+                var scancode = sdl_event.key.keysym.scancode;
+                // std.debug.print("{d}", .{scancode});
+                Keys[scancode].was_down = Keys[scancode].is_down;
+                Keys[scancode].is_down = true;
+            },
+            c.SDL_KEYUP => {
+                var scancode = sdl_event.key.keysym.scancode;
+                Keys[scancode].was_down = Keys[scancode].is_down;
+                Keys[scancode].is_down = false;
+            },
+            else => {},
+        }
+    }
+}
+
+pub fn update(dt: f32) !void {
+       
+    if(is_down(c.SDL_SCANCODE_ESCAPE)) {
+        running = false;
+    }
+
+    if(is_down(c.SDL_SCANCODE_RIGHT) or is_down(c.SDL_SCANCODE_L)) {
+        var new_rotation = Point {
+            .x = (game.player.rotation.x * std.math.cos(TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(TURN_RATE * dt)),
+            .y = (game.player.rotation.x * std.math.sin(TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(TURN_RATE * dt)),
+        };
+
+        game.player.rotation = new_rotation;
+    }
+
+    if(is_down(c.SDL_SCANCODE_LEFT) or is_down(c.SDL_SCANCODE_H)) {
+        var new_rotation = Point {
+            .x = (game.player.rotation.x * std.math.cos(-TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(-TURN_RATE * dt)),
+            .y = (game.player.rotation.x * std.math.sin(-TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(-TURN_RATE * dt)),
+        };
+        game.player.rotation = new_rotation;
+        // const normal = std.math.sqrt(player.rotation.x * player.rotation.x + player.rotation.y * player.rotation.y);
+    }
+
+
+    if(is_down(c.SDL_SCANCODE_UP) or is_down(c.SDL_SCANCODE_K)) {
+        game.player.vel = add(game.player.vel, scale(game.player.rotation, THRUST_VEL * dt));
+    }
+
+    game.player.pos = add(game.player.pos, scale(game.player.vel, dt));
+
+
+    if(came_down(c.SDL_SCANCODE_SPACE)){
+        var new_bullet: Bullet = .{
+            .pos = add(game.player.pos, scale(game.player.rotation, 15)),
+            .vel = scale(game.player.rotation, 7),
+            .lifetime = 5.0,
+        };
+        try game.bullets.append(new_bullet);
+    }
+
+    //update bullets
+    {
+        var i = game.bullets.items.len;
+        while(i > 0 ) {
+            i -= 1;
+            var b = game.bullets.items[i];
+            game.bullets.items[i].pos = add(b.pos, b.vel);
+            game.bullets.items[i].lifetime -= 0.1;
+
+            if (b.lifetime <= 0) {
+                _ = game.bullets.swapRemove(i);
+            }
+        }
+    }
+
+
+    if(came_down(c.SDL_SCANCODE_G)) {
+        try gen_asteroid(.{
+            .x = rand.float(f32) * 640, 
+            .y = rand.float(f32) * 400,
+        }, 50, 2);
+    }
+
+
+    if(came_down(c.SDL_SCANCODE_D)) {
+        debug_mode = !debug_mode;
+    }
+
+
+    //update asteroids
+    for(game.asteroids.items) |*a| {
+        a.*.pos = add(a.pos, scale(a.vel, dt));
+        a.*.rot += a.rot_vel * dt;
+        if (a.rot >= 2 * std.math.pi) {
+            a.*.rot -= 2 * std.math.pi;
+        }
+    }
+
+     //collision detection
+    //TODO: fix bug where two bullets destroy the same asteroid at the same time
+    var a_index = game.asteroids.items.len;
+    while (a_index > 0) {
+        a_index -= 1;
+        var a = game.asteroids.items[a_index];
+        var transformed_points: [a.vertices.len]Point = undefined;
+        for(a.vertices) |vertex, i| {
+            transformed_points[i] = transform(a.rot, a.pos, vertex);
+        }
+        var b_index = game.bullets.items.len;
+        while (b_index > 0) {
+            b_index -= 1;
+            var b = game.bullets.items[b_index];
+            if (point_in_polygon(b.pos, transformed_points[0..transformed_points.len])) {
+            if (a.gen > 0) {
+                try gen_asteroid(a.pos, a.size * 0.75, a.gen - 1);
+                try gen_asteroid(a.pos, a.size * 0.75, a.gen - 1);
+            }
+            // explosion(b.pos);
+            _ = game.asteroids.swapRemove(a_index);
+            _ = game.bullets.swapRemove(b_index);
+            // game.score += 10;
+            // play_sound_effect(1, 5);
+            break;
+          }
+        }
+      }
+}
+
+
 
 var game: Game = Game{
     .frame = 0,
@@ -319,6 +440,7 @@ var game: Game = Game{
 
 var rand: std.rand.Random = undefined;
 var debug_mode = false;
+var running = true;
 
 
 pub fn main() anyerror!void {
@@ -347,111 +469,13 @@ pub fn main() anyerror!void {
     // try gen_asteroids(10);
 
 
-    mainloop: while (true) {
+    while (running) {
 
         // std.debug.print("{d}\r", .{game.frame});
         
         //update keymap
-        for (Keys) |*key| {
-            key.*.was_down = key.is_down;
-        }
-
-        var sdl_event: c.SDL_Event = undefined;
-        while (c.SDL_PollEvent(&sdl_event) != 0) {
-            switch (sdl_event.type) {
-                c.SDL_QUIT => break :mainloop,
-                c.SDL_KEYDOWN => {
-                    var scancode = sdl_event.key.keysym.scancode;
-                    // std.debug.print("{d}", .{scancode});
-                    Keys[scancode].was_down = Keys[scancode].is_down;
-                    Keys[scancode].is_down = true;
-                },
-                c.SDL_KEYUP => {
-                    var scancode = sdl_event.key.keysym.scancode;
-                    Keys[scancode].was_down = Keys[scancode].is_down;
-                    Keys[scancode].is_down = false;
-                },
-                else => {},
-            }
-        }
-        
-        
-        if(is_down(c.SDL_SCANCODE_ESCAPE)) {
-            break :mainloop;
-        }
-
-        if(is_down(c.SDL_SCANCODE_RIGHT) or is_down(c.SDL_SCANCODE_L)) {
-            var new_rotation = Point {
-                .x = (game.player.rotation.x * std.math.cos(TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(TURN_RATE * dt)),
-                .y = (game.player.rotation.x * std.math.sin(TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(TURN_RATE * dt)),
-            };
-
-            game.player.rotation = new_rotation;
-        }
-
-        if(is_down(c.SDL_SCANCODE_LEFT) or is_down(c.SDL_SCANCODE_H)) {
-            var new_rotation = Point {
-                .x = (game.player.rotation.x * std.math.cos(-TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(-TURN_RATE * dt)),
-                .y = (game.player.rotation.x * std.math.sin(-TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(-TURN_RATE * dt)),
-            };
-            game.player.rotation = new_rotation;
-            // const normal = std.math.sqrt(player.rotation.x * player.rotation.x + player.rotation.y * player.rotation.y);
-        }
-
-
-        if(is_down(c.SDL_SCANCODE_UP) or is_down(c.SDL_SCANCODE_K)) {
-            game.player.vel = add(game.player.vel, scale(game.player.rotation, THRUST_VEL * dt));
-        }
-
-        game.player.pos = add(game.player.pos, scale(game.player.vel, dt));
-
-
-        if(came_down(c.SDL_SCANCODE_SPACE)){
-            var new_bullet: Bullet = .{
-                .pos = add(game.player.pos, scale(game.player.rotation, 15)),
-                .vel = scale(game.player.rotation, 7),
-                .lifetime = 5.0,
-            };
-            try game.bullets.append(new_bullet);
-        }
-
-        {
-            var i: usize = 0;
-            while(i < game.bullets.items.len) {
-                var b = game.bullets.items[i];
-                game.bullets.items[i].pos = add(b.pos, b.vel);
-                game.bullets.items[i].lifetime -= 0.1;
-
-                if (b.lifetime <= 0) {
-                    _ = game.bullets.swapRemove(i);
-                } else {
-                    i += 1;
-                }
-            }
-        }
-
-
-        if(came_down(c.SDL_SCANCODE_G)) {
-            try gen_asteroid(.{
-                .x = rand.float(f32) * 640, 
-                .y = rand.float(f32) * 400,
-            }, 50, 2);
-        }
-
-
-        if(came_down(c.SDL_SCANCODE_D)) {
-            debug_mode = !debug_mode;
-        }
-
-
-
-        for(game.asteroids.items) |*a| {
-            a.*.pos = add(a.pos, scale(a.vel, dt));
-            a.*.rot += a.rot_vel * dt;
-            if (a.rot >= 2 * std.math.pi) {
-                a.*.rot -= 2 * std.math.pi;
-            }
-        }
+        process_events();        
+        try update(1.0 / 144.0);
 
         _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         _ = c.SDL_RenderClear(renderer);
