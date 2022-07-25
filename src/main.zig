@@ -182,6 +182,28 @@ pub fn gen_asteroids(count: usize) !void {
   }
 }
 
+
+
+pub fn point_in_polygon(p: Point, vertices: []const Point) bool {
+    var odd = false;
+    var j: usize = vertices.len - 1;
+    var i: usize = 0;
+    // TODO(JOSH): check for and skip points that are colinear with a side?
+    //check for horizontal cast intersection
+    while(i < vertices.len) : (i += 1) {
+        if((vertices[i].y < p.y and vertices[j].y >= p.y) or (vertices[j].y < p.y and vertices[i].y >= p.y)) {
+            // calculate intersection
+            if (vertices[i].x + (p.y - vertices[i].y) / (vertices[j].y - vertices[i].y) * (vertices[j].x - vertices[i].x) < p.x) {
+                odd = !odd;
+            } 
+        }
+        j = i;
+    }
+    return odd;
+}
+
+
+
 pub fn draw_marker(renderer: *c.SDL_Renderer, x: c_int, y: c_int) void {
             _ = c.SDL_RenderDrawPoint(renderer, x, y); 
             _ = c.SDL_RenderDrawPoint(renderer, x, y + 1); 
@@ -193,7 +215,20 @@ pub fn draw_marker(renderer: *c.SDL_Renderer, x: c_int, y: c_int) void {
 pub fn draw_asteroids(renderer: *c.SDL_Renderer) void {
 
     for (game.asteroids.items) |a| {
-        _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
+        var transformed_points: [a.vertices.len]Point = undefined;
+        for(a.vertices) |vertex, i| {
+            transformed_points[i] = transform(a.rot, a.pos, vertex);
+        }
+
+        for(game.bullets.items) |b| {
+            if(point_in_polygon(b.pos, transformed_points[0..transformed_points.len])) {
+                _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0x00, c.SDL_ALPHA_OPAQUE);
+                break;
+            }
+        } else {
+            _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
+        }
+        
         var j: usize = 0;
         while (j < 5 - 1) : (j += 1) {
             var start = transform(a.rot, a.pos, a.vertices[j]);
