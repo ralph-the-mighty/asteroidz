@@ -113,7 +113,7 @@ pub fn draw_player(renderer: *c.SDL_Renderer) void {
     _ = c.SDL_RenderDrawLine(renderer, @floatToInt(c_int, p3.x), @floatToInt(c_int, p3.y), @floatToInt(c_int, p1.x), @floatToInt(c_int, p1.y));
 
 
-    if(is_down(c.SDL_SCANCODE_UP) and ((game.frame >> 1) & 0x1) == 1) {
+    if((is_down(c.SDL_SCANCODE_UP) or is_down(c.SDL_SCANCODE_K)) and ((game.frame >> 1) & 0x1) == 1) {
 
         var flame_p1 = sub(sub(p1, (scale(game.player.rotation, 2))), scale(perp_rotation, 3));
         var flame_p2 = add(sub(p2, (scale(game.player.rotation, 2))), scale(perp_rotation, 3));
@@ -204,7 +204,7 @@ pub fn main() anyerror!void {
             break :mainloop;
         }
 
-        if(is_down(c.SDL_SCANCODE_RIGHT)) {
+        if(is_down(c.SDL_SCANCODE_RIGHT) or is_down(c.SDL_SCANCODE_L)) {
             var new_rotation = Point {
                 .x = (game.player.rotation.x * std.math.cos(TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(TURN_RATE * dt)),
                 .y = (game.player.rotation.x * std.math.sin(TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(TURN_RATE * dt)),
@@ -213,7 +213,7 @@ pub fn main() anyerror!void {
             game.player.rotation = new_rotation;
         }
 
-        if(is_down(c.SDL_SCANCODE_LEFT)) {
+        if(is_down(c.SDL_SCANCODE_LEFT) or is_down(c.SDL_SCANCODE_H)) {
             var new_rotation = Point {
                 .x = (game.player.rotation.x * std.math.cos(-TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(-TURN_RATE * dt)),
                 .y = (game.player.rotation.x * std.math.sin(-TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(-TURN_RATE * dt)),
@@ -223,7 +223,7 @@ pub fn main() anyerror!void {
         }
 
 
-        if(is_down(c.SDL_SCANCODE_UP)) {
+        if(is_down(c.SDL_SCANCODE_UP) or is_down(c.SDL_SCANCODE_K)) {
             game.player.vel = add(game.player.vel, scale(game.player.rotation, THRUST_VEL * dt));
         }
 
