@@ -30,6 +30,7 @@ const Player = struct {
 
 
 
+
 pub fn add(a: Point, b: Point) Point {
     return .{
         .x = a.x + b.x,
@@ -51,6 +52,19 @@ pub fn scale(p: Point, scalar: f32) Point {
         .x = p.x * scalar,
         .y = p.y * scalar,
     };
+}
+
+
+pub fn rotate(angle: f32, point: Point) Point {
+    return Point{
+        .x = (point.x * std.math.cos(angle)) - (point.y * std.math.sin(angle)),
+        .y = (point.x * std.math.sin(angle)) + (point.y * std.math.cos(angle)),
+    };
+}
+
+
+pub fn transform(angle: f32, origin: Point, point: Point) Point {
+    return add(origin, rotate(angle, point));
 }
 
 
@@ -76,22 +90,136 @@ pub fn came_down(key: c.SDL_Scancode) bool {
 
 
 
-
-
-
-
 const Bullet = struct {
     pos: Point,
     vel: Point,
     lifetime: f32,
 };
 
+const Asteroid = struct {
+    pos: Point,
+    vertices: [5]Point,
+    vel: Point,
+
+    size: f32,
+    rot: f32,
+    rot_vel: f32,
+    gen: i32,
+};
+
 const Game = struct {
     frame: usize,
     player: Player,
     bullets: std.ArrayList(Bullet),
+    asteroids: std.ArrayList(Asteroid),
 };
 
+pub fn float_range(min: f32, max: f32) f32 {
+    return min + ((max - min) * rand.float(f32));
+}
+
+pub fn gen_asteroid(pos: Point, size: f32, gen: i32) !void {
+    var a: Asteroid = .{
+        .pos = pos,
+        .size = size,
+        .gen = gen,
+        .vel = .{
+            .x = float_range(-50, 50),
+            .y = float_range(-50, 50),
+        },
+        .rot_vel = float_range(-5, 5),
+        .rot = 0,
+        .vertices = undefined,
+    };
+
+    var i: usize = 0;
+    while(i < 5) : (i += 1) {
+        var angle = @intToFloat(f32, i) * (2 * std.math.pi) / 5;
+        var distance = float_range(a.size / 4, a.size);
+        a.vertices[i] = .{
+            .x = std.math.cos(angle) * distance,
+            .y = std.math.sin(angle) * distance
+        };
+    }
+
+    // adjust vertices so that the center of gravity 
+    // lies on the origin of the asteroid's coordinate system
+    var sum: Point = .{.x = 0, .y = 0};
+    var f: f32 = 0;
+    var twicearea: f32 = 0;
+    var j: usize = 0;
+    while (j < 5) : (j += 1) {
+        var p1 = a.vertices[j];
+        var p2 = a.vertices[(j + 1) % 5];
+        f = (p1.x * p2.y) - (p2.x * p1.y);
+        sum.x += (p1.x + p2.x) * f;
+        sum.y += (p1.y + p2.y) * f;
+        twicearea += f;
+    }
+
+
+    var center: Point = .{
+        .x = sum.x / (twicearea * 3),
+        .y = sum.y / (twicearea * 3),
+    };
+    var k: usize = 0;
+    while (k < 5) : (k += 1) {
+        a.vertices[k] = sub(a.vertices[k], center);
+    }
+
+    try game.asteroids.append(a);
+
+}
+
+
+pub fn gen_asteroids(count: usize) !void {
+  var i: usize = 0;
+  while (i < count) : (i += 1) {
+    try gen_asteroid(.{
+        .x = @intToFloat(f32, i) * 50, 
+        .y = @intToFloat(f32, i) * 50
+    }, 50, 2);
+  }
+}
+
+pub fn draw_marker(renderer: *c.SDL_Renderer, x: c_int, y: c_int) void {
+            _ = c.SDL_RenderDrawPoint(renderer, x, y); 
+            _ = c.SDL_RenderDrawPoint(renderer, x, y + 1); 
+            _ = c.SDL_RenderDrawPoint(renderer, x, y - 1); 
+            _ = c.SDL_RenderDrawPoint(renderer, x + 1, y); 
+            _ = c.SDL_RenderDrawPoint(renderer, x - 1, y);
+}
+
+pub fn draw_asteroids(renderer: *c.SDL_Renderer) void {
+
+    for (game.asteroids.items) |a| {
+        _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
+        var j: usize = 0;
+        while (j < 5 - 1) : (j += 1) {
+            var start = transform(a.rot, a.pos, a.vertices[j]);
+            var end = transform(a.rot, a.pos, a.vertices[j + 1]);
+            _ = c.SDL_RenderDrawLine(renderer, 
+                                    @floatToInt(c_int, start.x),
+                                    @floatToInt(c_int, start.y),
+                                    @floatToInt(c_int, end.x),
+                                    @floatToInt(c_int, end.y));
+        }
+        var start = transform(a.rot, a.pos, a.vertices[j]);
+        var end = transform(a.rot, a.pos, a.vertices[0]);
+        _ = c.SDL_RenderDrawLine(renderer, 
+            @floatToInt(c_int, start.x),
+            @floatToInt(c_int, start.y),
+            @floatToInt(c_int, end.x),
+            @floatToInt(c_int, end.y));
+            
+        if(debug_mode) {
+            _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0x00, 0x00, c.SDL_ALPHA_OPAQUE);
+            var x = @floatToInt(c_int, a.pos.x);
+            var y = @floatToInt(c_int, a.pos.y);
+            draw_marker(renderer, x, y);
+        }
+    }
+}
 
 pub fn draw_player(renderer: *c.SDL_Renderer) void {
     var p1: Point = .{.x=0, .y=0};
@@ -137,6 +265,7 @@ pub fn draw_bullets(renderer: *c.SDL_Renderer) void {
 var game: Game = Game{
     .frame = 0,
     .bullets = undefined,
+    .asteroids = undefined,
     .player = Player{
         .pos = .{
             .x = 200,
@@ -152,6 +281,9 @@ var game: Game = Game{
         }
     }
 };
+
+var rand: std.rand.Random = undefined;
+var debug_mode = false;
 
 
 pub fn main() anyerror!void {
@@ -170,6 +302,15 @@ pub fn main() anyerror!void {
     }
     game.bullets = std.ArrayList(Bullet).init(gpa.allocator());
     defer game.bullets.deinit();
+
+    game.asteroids = std.ArrayList(Asteroid).init(gpa.allocator());
+    defer game.asteroids.deinit();
+
+
+    rand = std.rand.DefaultPrng.init(0).random();
+
+    // try gen_asteroids(10);
+
 
     mainloop: while (true) {
 
@@ -239,17 +380,41 @@ pub fn main() anyerror!void {
             try game.bullets.append(new_bullet);
         }
 
+        {
+            var i: usize = 0;
+            while(i < game.bullets.items.len) {
+                var b = game.bullets.items[i];
+                game.bullets.items[i].pos = add(b.pos, b.vel);
+                game.bullets.items[i].lifetime -= 0.1;
 
-        var i: usize = 0;
-        while(i < game.bullets.items.len) {
-            var b = game.bullets.items[i];
-            game.bullets.items[i].pos = add(b.pos, b.vel);
-            game.bullets.items[i].lifetime -= 0.1;
+                if (b.lifetime <= 0) {
+                    _ = game.bullets.swapRemove(i);
+                } else {
+                    i += 1;
+                }
+            }
+        }
 
-            if (b.lifetime <= 0) {
-                _ = game.bullets.swapRemove(i);
-            } else {
-                i += 1;
+
+        if(came_down(c.SDL_SCANCODE_G)) {
+            try gen_asteroid(.{
+                .x = rand.float(f32) * 640, 
+                .y = rand.float(f32) * 400,
+            }, 50, 2);
+        }
+
+
+        if(came_down(c.SDL_SCANCODE_D)) {
+            debug_mode = !debug_mode;
+        }
+
+
+
+        for(game.asteroids.items) |*a| {
+            a.*.pos = add(a.pos, scale(a.vel, dt));
+            a.*.rot += a.rot_vel * dt;
+            if (a.rot >= 2 * std.math.pi) {
+                a.*.rot -= 2 * std.math.pi;
             }
         }
 
@@ -258,6 +423,7 @@ pub fn main() anyerror!void {
 
         draw_player(renderer.?);
         draw_bullets(renderer.?);
+        draw_asteroids(renderer.?);
 
         c.SDL_RenderPresent(renderer);
         game.frame += 1;
