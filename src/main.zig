@@ -3,7 +3,8 @@ const c = @cImport({
     @cInclude("SDL.h");
 });
 
-
+const SCREEN_WIDTH = 640;
+const SCREEN_HEIGHT = 480;
 const TURN_RATE: f32 = std.math.pi * 2.0;
 const THRUST_VEL = 500;
 const PLAYER_MAX_VEL = 400;
@@ -202,6 +203,23 @@ pub fn point_in_polygon(p: Point, vertices: []const Point) bool {
 }
 
 
+pub fn wrap_position(pos: *Point) void {
+    if(pos.x < 0) {
+        pos.*.x += SCREEN_WIDTH;
+    }
+    if(pos.y < 0) {
+        pos.*.y += SCREEN_HEIGHT;
+    }
+
+    if(pos.x >= SCREEN_WIDTH) {
+        pos.x -= SCREEN_WIDTH;
+    }
+    if(pos.y >= SCREEN_HEIGHT) {
+        pos.y -= SCREEN_HEIGHT;
+    }
+}
+
+
 
 pub fn draw_marker(renderer: *c.SDL_Renderer, x: c_int, y: c_int) void {
             _ = c.SDL_RenderDrawPoint(renderer, x, y); 
@@ -337,6 +355,7 @@ pub fn update(dt: f32) !void {
     }
 
     game.player.pos = add(game.player.pos, scale(game.player.vel, dt));
+    wrap_position(&game.player.pos);
 
 
     if(came_down(c.SDL_SCANCODE_SPACE)){
@@ -355,6 +374,7 @@ pub fn update(dt: f32) !void {
             i -= 1;
             var b = game.bullets.items[i];
             game.bullets.items[i].pos = add(b.pos, b.vel);
+            wrap_position(&game.bullets.items[i].pos);
             game.bullets.items[i].lifetime -= 0.1;
 
             if (b.lifetime <= 0) {
@@ -380,6 +400,8 @@ pub fn update(dt: f32) !void {
     //update asteroids
     for(game.asteroids.items) |*a| {
         a.*.pos = add(a.pos, scale(a.vel, dt));
+        wrap_position(&a.*.pos);
+
         a.*.rot += a.rot_vel * dt;
         if (a.rot >= 2 * std.math.pi) {
             a.*.rot -= 2 * std.math.pi;
@@ -447,7 +469,7 @@ pub fn main() anyerror!void {
     _ = c.SDL_Init(c.SDL_INIT_VIDEO | c.SDL_INIT_EVENTS);
     defer c.SDL_Quit();
 
-    var window = c.SDL_CreateWindow("asteroidz", c.SDL_WINDOWPOS_CENTERED, c.SDL_WINDOWPOS_CENTERED, 640, 400, 0);
+    var window = c.SDL_CreateWindow("asteroidz", c.SDL_WINDOWPOS_CENTERED, c.SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     defer c.SDL_DestroyWindow(window);
 
     var renderer = c.SDL_CreateRenderer(window, 0, c.SDL_RENDERER_PRESENTVSYNC);
@@ -466,7 +488,7 @@ pub fn main() anyerror!void {
 
     rand = std.rand.DefaultPrng.init(0).random();
 
-    // try gen_asteroids(10);
+    try gen_asteroids(10);
 
 
     while (running) {
@@ -475,7 +497,7 @@ pub fn main() anyerror!void {
         
         //update keymap
         process_events();        
-        try update(1.0 / 144.0);
+        try update(1.0 / 60.0);
 
         _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         _ = c.SDL_RenderClear(renderer);
