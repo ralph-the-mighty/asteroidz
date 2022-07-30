@@ -5,11 +5,14 @@ const c = @cImport({
 
 const SCREEN_WIDTH = 640;
 const SCREEN_HEIGHT = 480;
+
+// values in pixels (or radians) per second
 const TURN_RATE: f32 = std.math.pi * 2.0;
 const THRUST_VEL = 500;
 const PLAYER_MAX_VEL = 400;
 const PLAYER_MIN_VEL = 0;
 const BULLET_VEL = 500;
+const BULLET_LIFETIME = 2;
 
 
 const Renderer = struct {
@@ -301,31 +304,6 @@ pub fn draw_bullets(renderer: *c.SDL_Renderer) void {
 }
 
 
-pub fn process_events() void {
-    for (Keys) |*key| {
-        key.*.was_down = key.is_down;
-    }
-
-    var sdl_event: c.SDL_Event = undefined;
-    while (c.SDL_PollEvent(&sdl_event) != 0) {
-        switch (sdl_event.type) {
-            c.SDL_QUIT => running = false,
-            c.SDL_KEYDOWN => {
-                var scancode = sdl_event.key.keysym.scancode;
-                // std.debug.print("{d}", .{scancode});
-                Keys[scancode].was_down = Keys[scancode].is_down;
-                Keys[scancode].is_down = true;
-            },
-            c.SDL_KEYUP => {
-                var scancode = sdl_event.key.keysym.scancode;
-                Keys[scancode].was_down = Keys[scancode].is_down;
-                Keys[scancode].is_down = false;
-            },
-            else => {},
-        }
-    }
-}
-
 pub fn update(dt: f32) !void {
        
     if(is_down(c.SDL_SCANCODE_ESCAPE)) {
@@ -359,11 +337,11 @@ pub fn update(dt: f32) !void {
     wrap_position(&game.player.pos);
 
 
-    if(came_down(c.SDL_SCANCODE_SPACE)){
+    if(is_down(c.SDL_SCANCODE_SPACE)){
         var new_bullet: Bullet = .{
             .pos = add(game.player.pos, scale(game.player.rotation, 15)),
-            .vel = scale(game.player.rotation, 7),
-            .lifetime = 5.0,
+            .vel = scale(game.player.rotation, BULLET_VEL),
+            .lifetime = BULLET_LIFETIME,
         };
         try game.bullets.append(new_bullet);
     }
@@ -374,9 +352,9 @@ pub fn update(dt: f32) !void {
         while(i > 0 ) {
             i -= 1;
             var b = game.bullets.items[i];
-            game.bullets.items[i].pos = add(b.pos, b.vel);
+            game.bullets.items[i].pos = add(b.pos, scale(b.vel, dt));
             wrap_position(&game.bullets.items[i].pos);
-            game.bullets.items[i].lifetime -= 0.1;
+            game.bullets.items[i].lifetime -= dt;
 
             if (b.lifetime <= 0) {
                 _ = game.bullets.swapRemove(i);
@@ -440,63 +418,6 @@ pub fn update(dt: f32) !void {
 }
 
 
-
-pub fn update(dt: f32) anyerror!void {
-    if(is_down(c.SDL_SCANCODE_ESCAPE)) {
-        game.running = false;
-        return;
-    }
-
-    if(is_down(c.SDL_SCANCODE_RIGHT)) {
-        var new_rotation = Point {
-            .x = (game.player.rotation.x * std.math.cos(TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(TURN_RATE * dt)),
-            .y = (game.player.rotation.x * std.math.sin(TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(TURN_RATE * dt)),
-        };
-
-        game.player.rotation = new_rotation;
-    }
-
-    if(is_down(c.SDL_SCANCODE_LEFT)) {
-        var new_rotation = Point {
-            .x = (game.player.rotation.x * std.math.cos(-TURN_RATE * dt)) - (game.player.rotation.y * std.math.sin(-TURN_RATE * dt)),
-            .y = (game.player.rotation.x * std.math.sin(-TURN_RATE * dt)) + (game.player.rotation.y * std.math.cos(-TURN_RATE * dt)),
-        };
-        game.player.rotation = new_rotation;
-        // const normal = std.math.sqrt(player.rotation.x * player.rotation.x + player.rotation.y * player.rotation.y);
-    }
-
-
-    if(is_down(c.SDL_SCANCODE_UP)) {
-        game.player.vel = add(game.player.vel, scale(game.player.rotation, THRUST_VEL * dt));
-    }
-
-    game.player.pos = add(game.player.pos, scale(game.player.vel, dt));
-
-
-    if(came_down(c.SDL_SCANCODE_SPACE)){
-        var new_bullet: Bullet = .{
-            .pos = add(game.player.pos, scale(game.player.rotation, 15)),
-            .vel = scale(game.player.rotation, BULLET_VEL),
-            .lifetime = 5.0,
-        };
-        try game.bullets.append(new_bullet);
-    }
-
-
-    var i: usize = 0;
-    while(i < game.bullets.items.len) {
-        var b = game.bullets.items[i];
-        game.bullets.items[i].pos = add(b.pos, scale(b.vel, dt));
-        game.bullets.items[i].lifetime -= dt;
-
-        if (b.lifetime <= 0) {
-            _ = game.bullets.swapRemove(i);
-        } else {
-            i += 1;
-        }
-    }
-}
-
 pub fn process_events() void {
     //update keymap
     for (keys) |*key| {
@@ -507,7 +428,7 @@ pub fn process_events() void {
     while (c.SDL_PollEvent(&sdl_event) != 0) {
         switch (sdl_event.type) {
             c.SDL_QUIT => {
-                game.running = false;
+                running = false;
                 return;
             },
             c.SDL_KEYDOWN => {
@@ -579,36 +500,22 @@ pub fn main() anyerror!void {
 
     try gen_asteroids(10);
 
-//   seconds_per_tick := 1.0 / f32(sdl.get_performance_frequency());
-//   dt: f32 = 1.0 / 60.0;
-//   current_time := f32(sdl.get_performance_counter()) * seconds_per_tick;
-//   accumulator: f32 = 0.0;
 
-//   for running {
-//     new_time := f32(sdl.get_performance_counter()) * seconds_per_tick;
-//     frame_time := new_time - current_time;
-//     current_time = new_time;
-//     accumulator += frame_time;
-
-//     for accumulator >= dt {
-//       process_events();
-//       update(&global_game_state, dt);
-//       accumulator -= dt;
-//     }
+    std.debug.print("{}\n", .{c.SDL_SCANCODE_ESCAPE});
 
 
     const seconds_per_tick = 1.0 / @intToFloat(f32, c.SDL_GetPerformanceFrequency());
-    const dt: f32 = 1.0 / 10.0;
+    const dt: f32 = 1.0 / 144.0;
     var current_time: f32 = @intToFloat(f32, c.SDL_GetPerformanceCounter()) * seconds_per_tick;
     var accumulator: f32 = 0.0;
 
-    std.debug.print("seconds_per_tick: {}\n", .{seconds_per_tick});
-    std.debug.print("dt: {}\n", .{dt});
-    std.debug.print("current_time: {}\n", .{current_time});
-    std.debug.print("accumulator: {}\n", .{accumulator});
+    // std.debug.print("seconds_per_tick: {d}\n", .{seconds_per_tick});
+    // std.debug.print("dt: {d}\n", .{dt});
+    // std.debug.print("current_time: {d}\n", .{current_time});
+    // std.debug.print("accumulator: {d}\n", .{accumulator});
 
 
-    while (game.running) {
+    while (running) {
         // var x = c.SDL_GetPerformanceCounter();
         // std.debug.print("{d}\n", .{x});
         var new_time: f32 = @intToFloat(f32, c.SDL_GetPerformanceCounter()) * seconds_per_tick;
@@ -616,15 +523,15 @@ pub fn main() anyerror!void {
         current_time = new_time;
         accumulator += frame_time;
 
-        if(game.frame < 5000) {
-            std.debug.print("= = = = frame {} = = = =\n", .{game.frame});
-            std.debug.print("  new_time: {}\n", .{new_time});
-            std.debug.print("  frame_time: {}\n", .{frame_time});
-            std.debug.print("  current_time: {}\n", .{current_time});
-            std.debug.print("  accumulator: {}\n", .{accumulator});
-        }
+        // if(game.frame < 500) {
+        //     std.debug.print("= = = = frame {d} = = = =\n", .{game.frame});
+        //     std.debug.print("  new_time: {d}\n", .{new_time});
+        //     std.debug.print("  frame_time: {d}\n", .{frame_time});
+        //     std.debug.print("  current_time: {d}\n", .{current_time});
+        //     std.debug.print("  accumulator: {d}\n", .{accumulator});
+        // }
 
-        process_events();      
+ 
         while(accumulator >= dt) {
             // std.debug.print("simulate!\n", .{});
             process_events();
