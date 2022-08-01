@@ -433,7 +433,6 @@ pub fn process_events() void {
             },
             c.SDL_KEYDOWN => {
                 var scancode = sdl_event.key.keysym.scancode;
-                std.debug.print("{d}", .{scancode});
                 keys[scancode].was_down = keys[scancode].is_down;
                 keys[scancode].is_down = true;
             },
@@ -500,8 +499,6 @@ pub fn main() anyerror!void {
 
     try gen_asteroids(10);
 
-
-    std.debug.print("{}\n", .{c.SDL_SCANCODE_ESCAPE});
 
 
     const seconds_per_tick = 1.0 / @intToFloat(f32, c.SDL_GetPerformanceFrequency());
