@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @cImport({
     @cInclude("SDL.h");
+    @cInclude("SDL_ttf.h");
 });
 
 const SCREEN_WIDTH = 640;
@@ -12,7 +13,7 @@ const THRUST_VEL = 500;
 const PLAYER_MAX_VEL = 400;
 const PLAYER_MIN_VEL = 0;
 const BULLET_VEL = 500;
-const BULLET_LIFETIME = 2;
+const BULLET_LIFETIME = 1;
 
 
 const Renderer = struct {
@@ -337,7 +338,7 @@ pub fn update(dt: f32) !void {
     wrap_position(&game.player.pos);
 
 
-    if(is_down(c.SDL_SCANCODE_SPACE)){
+    if(came_down(c.SDL_SCANCODE_SPACE)){
         var new_bullet: Bullet = .{
             .pos = add(game.player.pos, scale(game.player.rotation, 15)),
             .vel = scale(game.player.rotation, BULLET_VEL),
@@ -472,6 +473,35 @@ var rand: std.rand.Random = undefined;
 var debug_mode = false;
 var running = true;
 
+var minecraft: ?*c.TTF_Font = null;
+var arial: ?*c.TTF_Font = null;
+
+
+pub fn render_text(renderer: *c.SDL_Renderer, text: [*:0]const u8, x: i32, y: i32) !void {
+
+    var text_surface = c.TTF_RenderUTF8_Solid(minecraft, text, c.SDL_Color{.r=255, .g=255, .b=255, .a=255});
+    defer c.SDL_FreeSurface(text_surface);
+    
+    var text_texture = c.SDL_CreateTextureFromSurface(renderer, text_surface);
+    defer c.SDL_DestroyTexture(text_texture);
+    //free the text texture!!
+
+    var destination_rect: c.SDL_Rect = .{
+        .x = @mod(x, SCREEN_WIDTH),
+        .y = @mod(y, SCREEN_HEIGHT),
+        .w = 0,
+        .h = 0,
+    };
+
+
+    _ = c.SDL_QueryTexture(text_texture, null, null, &destination_rect.w, &destination_rect.h);
+
+    var res = c.SDL_RenderCopy(renderer, text_texture, null, &destination_rect);
+    if(res < 0) {
+        std.debug.print("failed to render copy! {s}\n", .{c.SDL_GetError()});
+    }
+}
+
 
 pub fn main() anyerror!void {
     _ = c.SDL_Init(c.SDL_INIT_VIDEO | c.SDL_INIT_EVENTS);
@@ -483,6 +513,10 @@ pub fn main() anyerror!void {
     var renderer = c.SDL_CreateRenderer(window, 0, c.SDL_RENDERER_PRESENTVSYNC);
     defer c.SDL_DestroyRenderer(renderer);
 
+    if(c.TTF_Init() == -1) {
+        std.debug.print("TTF failed to init!\n", .{});
+    }
+
     var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = true }){};
     defer {
         _ = gpa.deinit();
@@ -490,10 +524,8 @@ pub fn main() anyerror!void {
     game.bullets = std.ArrayList(Bullet).init(gpa.allocator());
     defer game.bullets.deinit();
 
-
     game.asteroids = std.ArrayList(Asteroid).init(gpa.allocator());
     defer game.asteroids.deinit();
-
 
     rand = std.rand.DefaultPrng.init(0).random();
 
@@ -501,36 +533,30 @@ pub fn main() anyerror!void {
 
 
 
+
+    minecraft = c.TTF_OpenFont("C:\\Users\\JoshPC\\projects\\Random_Projects\\zig\\asteroidz\\minecraft.ttf\x00", 16);
+    arial = c.TTF_OpenFont("C:\\Users\\JoshPC\\projects\\Random_Projects\\zig\\asteroidz\\arial.ttf\x00", 16);
+
+    if(minecraft == null) {
+        std.debug.print("Could not open font!\n", .{});
+        std.debug.print("{s}\n", .{c.SDL_GetError()});
+    }
+
+    try render_text(renderer.?, "Ai! Laurie lantar lassi surinen!", 100, 200);
+
+
     const seconds_per_tick = 1.0 / @intToFloat(f32, c.SDL_GetPerformanceFrequency());
     const dt: f32 = 1.0 / 144.0;
     var current_time: f32 = @intToFloat(f32, c.SDL_GetPerformanceCounter()) * seconds_per_tick;
     var accumulator: f32 = 0.0;
 
-    // std.debug.print("seconds_per_tick: {d}\n", .{seconds_per_tick});
-    // std.debug.print("dt: {d}\n", .{dt});
-    // std.debug.print("current_time: {d}\n", .{current_time});
-    // std.debug.print("accumulator: {d}\n", .{accumulator});
-
-
     while (running) {
-        // var x = c.SDL_GetPerformanceCounter();
-        // std.debug.print("{d}\n", .{x});
         var new_time: f32 = @intToFloat(f32, c.SDL_GetPerformanceCounter()) * seconds_per_tick;
         var frame_time = new_time - current_time;
         current_time = new_time;
         accumulator += frame_time;
-
-        // if(game.frame < 500) {
-        //     std.debug.print("= = = = frame {d} = = = =\n", .{game.frame});
-        //     std.debug.print("  new_time: {d}\n", .{new_time});
-        //     std.debug.print("  frame_time: {d}\n", .{frame_time});
-        //     std.debug.print("  current_time: {d}\n", .{current_time});
-        //     std.debug.print("  accumulator: {d}\n", .{accumulator});
-        // }
-
  
         while(accumulator >= dt) {
-            // std.debug.print("simulate!\n", .{});
             process_events();
             try update(dt);
             accumulator -= dt;
@@ -539,7 +565,9 @@ pub fn main() anyerror!void {
         _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         _ = c.SDL_RenderClear(renderer);
         
+
         draw_player(renderer.?);
+        try render_text(renderer.?, "Player One", @floatToInt(i32, game.player.pos.x - 40), @floatToInt(i32, game.player.pos.y - 30));
         draw_bullets(renderer.?);
         draw_asteroids(renderer.?);
 

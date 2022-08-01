@@ -42,6 +42,18 @@ pub fn build(b: *std.build.Builder) void {
     exe.addLibPath(sdl_path ++ "lib\\x64");
     b.installBinFile(sdl_path ++ "lib\\x64\\SDL2.dll", "SDL2.dll");
     exe.linkSystemLibrary("sdl2");
+
+
+    exe.addLibPath("C:\\Odin\\vendor\\sdl2\\ttf");
+    exe.linkSystemLibrary("SDL2_ttf");
+
+
+    const sdl_ttf_path = "C:\\Users\\JoshPC\\Downloads\\SDL_ttf-release-2.20.0-source\\SDL_ttf-release-2.20.0";
+    exe.addIncludeDir(sdl_ttf_path);
+    b.installBinFile("C:\\Users\\JoshPC\\Downloads\\SDL2_ttf-2.20.0-win32-x64\\SDL2_ttf.dll", "SDL2_ttf.dll");
+
+
+
     exe.linkLibC();
     exe.install();
 }
