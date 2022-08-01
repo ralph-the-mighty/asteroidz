@@ -20,6 +20,7 @@ const Renderer = struct {
     sdl_renderer: c.SDL_Renderer,
 };
 
+
 const Point = struct {
     x: f32,
     y: f32,
@@ -31,8 +32,6 @@ const Player = struct {
     rotation: Point,
     vel: Point,
 };
-
-
 
 
 pub fn add(a: Point, b: Point) Point {
@@ -306,10 +305,17 @@ pub fn draw_bullets(renderer: *c.SDL_Renderer) void {
 
 
 pub fn update(dt: f32) !void {
+    game.frame += 1;
        
     if(is_down(c.SDL_SCANCODE_ESCAPE)) {
         running = false;
     }
+
+    if(came_down(c.SDL_SCANCODE_P)) {
+        paused = !paused;
+    }
+
+    if (paused) return;
 
     if(is_down(c.SDL_SCANCODE_RIGHT) or is_down(c.SDL_SCANCODE_L)) {
         var new_rotation = Point {
@@ -328,6 +334,9 @@ pub fn update(dt: f32) !void {
         game.player.rotation = new_rotation;
         // const normal = std.math.sqrt(player.rotation.x * player.rotation.x + player.rotation.y * player.rotation.y);
     }
+
+
+
 
 
     if(is_down(c.SDL_SCANCODE_UP) or is_down(c.SDL_SCANCODE_K)) {
@@ -472,6 +481,7 @@ var game: Game = Game{
 var rand: std.rand.Random = undefined;
 var debug_mode = false;
 var running = true;
+var paused = false;
 
 var minecraft: ?*c.TTF_Font = null;
 var arial: ?*c.TTF_Font = null;
@@ -572,7 +582,5 @@ pub fn main() anyerror!void {
         draw_asteroids(renderer.?);
 
         c.SDL_RenderPresent(renderer);
-
-        game.frame += 1;
     }
 }
