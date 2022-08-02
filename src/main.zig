@@ -486,9 +486,9 @@ var minecraft: ?*c.TTF_Font = null;
 var arial: ?*c.TTF_Font = null;
 
 
-pub fn render_text(renderer: *c.SDL_Renderer, text: [*:0]const u8, x: i32, y: i32) !void {
+pub fn render_text(renderer: *c.SDL_Renderer, font: ?*c.TTF_Font, text: [*:0]const u8, x: i32, y: i32) !void {
 
-    var text_surface = c.TTF_RenderUTF8_Solid(minecraft, text, c.SDL_Color{.r=255, .g=255, .b=255, .a=255});
+    var text_surface = c.TTF_RenderUTF8_Solid(font, text, c.SDL_Color{.r=255, .g=255, .b=255, .a=255});
     defer c.SDL_FreeSurface(text_surface);
     
     var text_texture = c.SDL_CreateTextureFromSurface(renderer, text_surface);
@@ -551,7 +551,7 @@ pub fn main() anyerror!void {
         std.debug.print("{s}\n", .{c.SDL_GetError()});
     }
 
-    try render_text(renderer.?, "Ai! Laurie lantar lassi surinen!", 100, 200);
+    try render_text(renderer.?, minecraft, "Ai! Laurie lantar lassi surinen!", 100, 200);
 
 
     const seconds_per_tick = 1.0 / @intToFloat(f32, c.SDL_GetPerformanceFrequency());
@@ -576,7 +576,7 @@ pub fn main() anyerror!void {
         
 
         draw_player(renderer.?);
-        try render_text(renderer.?, "Player One", @floatToInt(i32, game.player.pos.x - 40), @floatToInt(i32, game.player.pos.y - 30));
+        try render_text(renderer.?, minecraft, "Player One", @floatToInt(i32, game.player.pos.x - 40), @floatToInt(i32, game.player.pos.y - 30));
         draw_bullets(renderer.?);
         draw_asteroids(renderer.?);
 
