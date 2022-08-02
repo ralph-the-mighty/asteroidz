@@ -1,9 +1,9 @@
 const std = @import("std");
 
 
-pub const sdl_path = "C:\\lib\\SDL2-2.0.22\\";
+pub const sdl_path = "C:\\lib\\SDL2-2.0.14\\";
 pub const sdl_ttf_lib_path = "C:\\Odin\\vendor\\sdl2\\ttf\\";
-pub const sdl_ttf_source_path = "C:\\lib\\SDL_ttf-release-2.20.0";
+pub const sdl_ttf_source_path = "C:\\Users\\JoshPC\\Downloads\\SDL_ttf-release-2.20.0-source\\SDL_ttf-release-2.20.0";
 
 
 pub const SCREEN_WIDTH = 640;
