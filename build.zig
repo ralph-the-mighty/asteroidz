@@ -26,8 +26,8 @@
 //     run_step.dependOn(&run_cmd.step);
 // }
 
-
 const std = @import("std");
+const constants = @import("src/constants.zig");
 
 pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{ .default_target = .{ .abi = .gnu } });
@@ -37,20 +37,18 @@ pub fn build(b: *std.build.Builder) void {
     exe.setTarget(target);
     exe.setBuildMode(mode);
 
-    const sdl_path = "C:\\lib\\SDL2-2.0.14\\";
+    const sdl_path = constants.sdl_path;
     exe.addIncludeDir(sdl_path ++ "include");
     exe.addLibPath(sdl_path ++ "lib\\x64");
     b.installBinFile(sdl_path ++ "lib\\x64\\SDL2.dll", "SDL2.dll");
     exe.linkSystemLibrary("sdl2");
 
 
-    exe.addLibPath("C:\\Odin\\vendor\\sdl2\\ttf");
+    exe.addLibPath(constants.sdl_ttf_lib_path);
     exe.linkSystemLibrary("SDL2_ttf");
 
-
-    const sdl_ttf_path = "C:\\Users\\JoshPC\\Downloads\\SDL_ttf-release-2.20.0-source\\SDL_ttf-release-2.20.0";
-    exe.addIncludeDir(sdl_ttf_path);
-    b.installBinFile("C:\\Users\\JoshPC\\Downloads\\SDL2_ttf-2.20.0-win32-x64\\SDL2_ttf.dll", "SDL2_ttf.dll");
+    exe.addIncludeDir(constants.sdl_ttf_source_path);
+    b.installBinFile(constants.sdl_ttf_lib_path ++ "SDL2_ttf.dll", "SDL2_ttf.dll");
 
 
 

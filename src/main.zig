@@ -4,16 +4,15 @@ const c = @cImport({
     @cInclude("SDL_ttf.h");
 });
 
-const SCREEN_WIDTH = 640;
-const SCREEN_HEIGHT = 480;
-
-// values in pixels (or radians) per second
-const TURN_RATE: f32 = std.math.pi * 2.0;
-const THRUST_VEL = 500;
-const PLAYER_MAX_VEL = 400;
-const PLAYER_MIN_VEL = 0;
-const BULLET_VEL = 500;
-const BULLET_LIFETIME = 1;
+const constants = @import("constants.zig");
+const SCREEN_WIDTH = constants.SCREEN_WIDTH;
+const SCREEN_HEIGHT = constants.SCREEN_HEIGHT;
+const TURN_RATE = constants.TURN_RATE;
+const THRUST_VEL = constants.THRUST_VEL; 
+const PLAYER_MAX_VEL = constants.PLAYER_MAX_VEL;
+const PLAYER_MIN_VEL = constants.PLAYER_MIN_VEL;
+const BULLET_VEL = constants.BULLET_VEL;
+const BULLET_LIFETIME = constants.BULLET_LIFETIME;
 
 
 const Renderer = struct {
@@ -544,8 +543,8 @@ pub fn main() anyerror!void {
 
 
 
-    minecraft = c.TTF_OpenFont("C:\\Users\\JoshPC\\projects\\Random_Projects\\zig\\asteroidz\\minecraft.ttf\x00", 16);
-    arial = c.TTF_OpenFont("C:\\Users\\JoshPC\\projects\\Random_Projects\\zig\\asteroidz\\arial.ttf\x00", 16);
+    minecraft = c.TTF_OpenFont(constants.fonts_path ++ "minecraft.ttf", 16);
+    arial     = c.TTF_OpenFont(constants.fonts_path ++ "arial.ttf", 16);
 
     if(minecraft == null) {
         std.debug.print("Could not open font!\n", .{});
