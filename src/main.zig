@@ -90,7 +90,40 @@ pub fn came_down(key: c.SDL_Scancode) bool {
 }
 
 
+const Particle = struct {
+    pos: Point,
+    vel: Point,
+    lifetime: f32,
+};
 
+pub fn explosion (x: f32, y: f32) !void {
+    var i: i32 = 0;
+    while (i < 100): (i += 1) {
+        var vel = float_range(50, 200);
+        var angle = float_range(0, 2 * std.math.pi);
+        var p = Particle{
+            .pos = .{.x=x, .y=y},
+            .vel = .{
+                .x = @cos(angle) * vel,
+                .y = @sin(angle) * vel,
+            },
+            .lifetime = float_range(0.25, 0.75)
+        };
+
+        try game.particles.append(p);
+    }
+//   for i in 0..100 {
+//     p := Particle{
+//       pos = pos,
+//       lifetime = rand.float32_range(0.25, 0.75)
+//     };
+//     vel := rand.float32_range(50, 200);
+//     angle := rand.float32_range(0, 2 * math.PI);
+//     p.vel.x = math.cos(angle) * vel;
+//     p.vel.y = math.sin(angle) * vel;
+//     append(&particles, p);
+//   }
+} 
 
 const Bullet = struct {
     pos: Point,
@@ -115,6 +148,7 @@ const Game = struct {
     player: Player,
     bullets: std.ArrayList(Bullet),
     asteroids: std.ArrayList(Asteroid),
+    particles: std.ArrayList(Particle),
 };
 
 pub fn float_range(min: f32, max: f32) f32 {
@@ -302,6 +336,13 @@ pub fn draw_bullets(renderer: *c.SDL_Renderer) void {
     }
 }
 
+pub fn draw_particles(renderer: *c.SDL_Renderer) void {
+    _ = c.SDL_SetRenderDrawColor(renderer, 0xff, 0xff, 0xff, c.SDL_ALPHA_OPAQUE);
+    for (game.particles.items) |p| {
+        _ = c.SDL_RenderDrawPoint(renderer, @floatToInt(c_int, p.pos.x), @floatToInt(c_int, p.pos.y));
+    }
+}
+
 
 pub fn update(dt: f32) !void {
     game.frame += 1;
@@ -346,7 +387,7 @@ pub fn update(dt: f32) !void {
     wrap_position(&game.player.pos);
 
 
-    if(came_down(c.SDL_SCANCODE_SPACE)){
+    if(is_down(c.SDL_SCANCODE_SPACE)){
         var new_bullet: Bullet = .{
             .pos = add(game.player.pos, scale(game.player.rotation, 15)),
             .vel = scale(game.player.rotation, BULLET_VEL),
@@ -396,6 +437,22 @@ pub fn update(dt: f32) !void {
         }
     }
 
+    //update particles
+    {
+        var i = game.particles.items.len;
+        while(i > 0 ) {
+            i -= 1;
+            var p = game.particles.items[i];
+            game.particles.items[i].pos = add(p.pos, scale(p.vel, dt));
+            wrap_position(&game.particles.items[i].pos);
+            game.particles.items[i].lifetime -= dt;
+
+            if (p.lifetime <= 0) {
+                _ = game.particles.swapRemove(i);
+            }
+        }
+    }    
+
      //collision detection
     //TODO: fix bug where two bullets destroy the same asteroid at the same time
     var a_index = game.asteroids.items.len;
@@ -415,7 +472,7 @@ pub fn update(dt: f32) !void {
                 try gen_asteroid(a.pos, a.size * 0.75, a.gen - 1);
                 try gen_asteroid(a.pos, a.size * 0.75, a.gen - 1);
             }
-            // explosion(b.pos);
+            try explosion(b.pos.x, b.pos.y);
             _ = game.asteroids.swapRemove(a_index);
             _ = game.bullets.swapRemove(b_index);
             // game.score += 10;
@@ -461,6 +518,7 @@ var game: Game = Game{
     .running = true,
     .bullets = undefined,
     .asteroids = undefined,
+    .particles = undefined,
     .player = Player{
         .pos = .{
             .x = 200,
@@ -536,6 +594,9 @@ pub fn main() anyerror!void {
     game.asteroids = std.ArrayList(Asteroid).init(gpa.allocator());
     defer game.asteroids.deinit();
 
+    game.particles = std.ArrayList(Particle).init(gpa.allocator());
+    defer game.particles.deinit();
+
     rand = std.rand.DefaultPrng.init(0).random();
 
     try gen_asteroids(10);
@@ -579,6 +640,7 @@ pub fn main() anyerror!void {
         try render_text(renderer.?, minecraft, "Player One", @floatToInt(i32, game.player.pos.x - 40), @floatToInt(i32, game.player.pos.y - 30));
         draw_bullets(renderer.?);
         draw_asteroids(renderer.?);
+        draw_particles(renderer.?);
 
         c.SDL_RenderPresent(renderer);
     }
