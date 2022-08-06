@@ -98,8 +98,8 @@ const Particle = struct {
 
 pub fn explosion (x: f32, y: f32) !void {
     var i: i32 = 0;
-    while (i < 100): (i += 1) {
-        var vel = float_range(50, 200);
+    while (i < 500): (i += 1) {
+        var vel = float_range(0, 200);
         var angle = float_range(0, 2 * std.math.pi);
         var p = Particle{
             .pos = .{.x=x, .y=y},
@@ -161,8 +161,8 @@ pub fn gen_asteroid(pos: Point, size: f32, gen: i32) !void {
         .size = size,
         .gen = gen,
         .vel = .{
-            .x = float_range(-50, 50),
-            .y = float_range(-50, 50),
+            .x = float_range(-50, 50) * @intToFloat(f32, (3 - gen)),
+            .y = float_range(-50, 50) * @intToFloat(f32, (3 - gen)),
         },
         .rot_vel = float_range(-5, 5),
         .rot = 0,
@@ -387,7 +387,7 @@ pub fn update(dt: f32) !void {
     wrap_position(&game.player.pos);
 
 
-    if(is_down(c.SDL_SCANCODE_SPACE)){
+    if(came_down(c.SDL_SCANCODE_SPACE)){
         var new_bullet: Bullet = .{
             .pos = add(game.player.pos, scale(game.player.rotation, 15)),
             .vel = scale(game.player.rotation, BULLET_VEL),
